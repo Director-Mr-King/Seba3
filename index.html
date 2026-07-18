@@ -16,68 +16,58 @@
         .target { border: 5px solid #ef4444 !important; box-shadow: 0 0 25px #ef4444 !important; animation: pulse-target 1.5s infinite alternate; }
         .success { border: 5px solid #22c55e !important; box-shadow: 0 0 25px #22c55e !important; }
         @keyframes pulse-target { from { box-shadow: 0 0 15px #ef4444; } to { box-shadow: 0 0 35px #ef4444; } }
-        #dino { font-size: 80px; transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.2); }
-        .party-dino { position: absolute; font-size: 70px; animation: party-dance 0.4s infinite alternate; z-index: 5; }
-        @keyframes party-dance { 0% { transform: translateY(0) scale(1) rotate(-15deg); } 100% { transform: translateY(-30px) scale(1.1) rotate(15deg); } }
+        #dino { font-size: 80px; position: absolute; transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.2); }
+        .zoom-pulse { animation: zoom-slow 3s infinite ease-in-out; }
+        @keyframes zoom-slow { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-end pb-8">
+
     <div id="game-ui" class="absolute top-4 bg-slate-900/90 border border-slate-700/50 p-4 rounded-2xl shadow-2xl text-center max-w-sm w-11/12 z-50 backdrop-blur-md">
         <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Select Challenge</span>
-            <span id="progress-text" class="text-xs font-bold text-emerald-400">Note 1 of 0</span>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Select Song</span>
+            <span id="progress-text" class="text-xs font-bold text-emerald-400">Note 1 of 42</span>
         </div>
         <select id="song-select" class="w-full bg-slate-800 text-white font-black text-lg py-2 px-3 rounded-xl border border-slate-700 mb-3" onchange="loadSong()">
-            <option value="baa">🐑 Baa Baa Black Sheep</option>
-            <option value="brother">🔔 Brother John</option>
-            <option value="happy">🎂 Happy Birthday to You</option>
+            <option value="baa">Baa Baa Black Sheep</option>
+            <option value="brother">Brother John</option>
+            <option value="happy">Happy Birthday to You</option>
+            <option value="mary">Mary Had a Little Lamb</option>
         </select>
+        <button id="mic-btn" class="w-full py-2 mb-3 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-500 transition-colors" onclick="toggleMic()">🎤 Start Mic</button>
         <div class="p-2 bg-slate-800/50 rounded-xl">
             <p id="instruction" class="text-base font-bold text-slate-200">Hit the Red Note!</p>
         </div>
         <div id="party-message" class="hidden mt-4">
-            <p class="text-2xl font-black text-yellow-400 animate-bounce">YOU DID IT SEBA !!!</p>
-            <img src="https://i.ibb.co/b3wJ1Zg/WhatsApp-Image-2026-07-18-at-1-32-07-PM.jpg" class="mx-auto mt-2 w-24 h-24 rounded-full border-4 border-yellow-400 shadow-lg" alt="Seba">
+            <p class="text-3xl font-black text-yellow-400 animate-bounce mb-2">YOU DID IT SEBA !!!</p>
+            <img src="KING.jpeg" class="mx-auto mt-2 w-72 h-72 rounded-full border-4 border-yellow-400 shadow-lg zoom-pulse" alt="Seba">
         </div>
         <button id="reset-party-btn" class="hidden mt-3 w-full py-2 bg-emerald-500 text-white font-black rounded-xl" onclick="resetGameAfterParty()">Play Another Song! 🔄</button>
     </div>
 
-    <div id="dino-container" class="absolute top-[25%] left-[5%] w-[100px] h-[400px] z-10 flex flex-col justify-end items-center pointer-events-none">
+    <div id="dino-container" class="absolute top-[25%] left-[5%] w-[100px] h-[500px] z-10 flex flex-col justify-end items-center pointer-events-none">
         <div id="dino">🦖</div>
     </div>
-
+    
     <div id="piano" class="bg-slate-950 p-6 rounded-[32px] shadow-2xl flex border-t-8 border-slate-800"></div>
 
     <script>
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let isMicActive = false, isPartyActive = false, currentSong = [], currentStep = 0, lastDinoNote = 0;
         
-        function playGrandTone(freq) {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            const now = audioCtx.currentTime;
-            [1, 2, 4].forEach((harmonic, i) => {
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.type = i === 0 ? 'triangle' : 'sine';
-                osc.frequency.value = freq * harmonic;
-                gain.gain.setValueAtTime(0.2 / harmonic, now);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start(now);
-                osc.stop(now + 1.8);
-            });
-        }
-
+        const notes = [
+            {note:'C', freq:261.63, type:'white'}, {note:'', freq:277.18, type:'black'}, {note:'D', freq:293.66, type:'white'}, {note:'', freq:311.13, type:'black'}, {note:'E', freq:329.63, type:'white'}, {note:'F', freq:349.23, type:'white'}, {note:'', freq:369.99, type:'black'}, {note:'G', freq:392.00, type:'white'}, {note:'', freq:415.30, type:'black'}, {note:'A', freq:440.00, type:'white'}, {note:'', freq:466.16, type:'black'}, {note:'B', freq:493.88, type:'white'}
+        ];
+        
         const songs = {
-            baa: ['C', 'C', 'G', 'G', 'A', 'A', 'G', 'F', 'F', 'E', 'E', 'D', 'D', 'C'],
-            brother: ['C', 'D', 'E', 'C', 'C', 'D', 'E', 'C', 'E', 'F', 'G', 'E', 'F', 'G', 'G', 'A', 'G', 'F', 'E', 'C', 'G', 'G', 'C'],
-            happy: ['C', 'C', 'D', 'C', 'F', 'E', 'C', 'C', 'D', 'C', 'G', 'F', 'C', 'C', 'C', 'A', 'F', 'E', 'D', 'A', 'A', 'F', 'G', 'F']
+            baa: ['C','C','G','G','A','A','G','F','F','E','E','D','D','C','G','G','F','F','E','E','D','G','G','F','F','E','E','D','C','C','G','G','A','A','G','F','F','E','E','D','D','C'],
+            brother: ['C','D','E','C','C','D','E','C','E','F','G','E','F','G','G','A','G','F','E','C','G','A','G','F','E','C','C','G','C','C','G','C'],
+            happy: ['C','C','D','C','F','E','C','C','D','C','G','F','C','C','C','A','F','E','D','A','A','F','G','F'],
+            mary: ['E','D','C','D','E','E','E','D','D','D','E','G','G','E','D','C','D','E','E','E','E','D','D','E','D','C']
         };
 
-        let currentSong = [], currentStep = 0, isPartyActive = false, partyInterval = null;
         const piano = document.getElementById('piano');
         const keyElements = [];
-        const notes = [{note:'C', freq:261.63, type:'white'}, {note:'', freq:277.18, type:'black'}, {note:'D', freq:293.66, type:'white'}, {note:'', freq:311.13, type:'black'}, {note:'E', freq:329.63, type:'white'}, {note:'F', freq:349.23, type:'white'}, {note:'', freq:369.99, type:'black'}, {note:'G', freq:392.00, type:'white'}, {note:'', freq:415.30, type:'black'}, {note:'A', freq:440.00, type:'white'}, {note:'', freq:466.16, type:'black'}, {note:'B', freq:493.88, type:'white'}];
 
         notes.forEach((key, i) => {
             const btn = document.createElement('div');
@@ -89,23 +79,36 @@
             keyElements.push(btn);
         });
 
+        function playGrandTone(freq, duration = 1.2) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+            [1, 2.01, 3.05, 4.1].forEach((h, i) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = i === 0 ? 'triangle' : 'sine';
+                osc.frequency.value = freq * h;
+                const v = (0.2 / (i + 1));
+                gain.gain.setValueAtTime(v, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(now); osc.stop(now + duration);
+            });
+        }
+
         function loadSong() {
             isPartyActive = false;
-            clearInterval(partyInterval);
             currentSong = songs[document.getElementById('song-select').value];
             currentStep = 0;
             document.getElementById('reset-party-btn').classList.add('hidden');
             document.getElementById('party-message').classList.add('hidden');
             document.getElementById('instruction').classList.remove('hidden');
-            document.querySelectorAll('.party-dino').forEach(el => el.remove());
+            document.getElementById('dino-container').classList.remove('hidden');
             updateTarget();
         }
 
         function updateTarget() {
             keyElements.forEach(el => el.classList.remove('target', 'success'));
-            if (currentStep < currentSong.length) {
-                keyElements.forEach(el => { if (el.dataset.note === currentSong[currentStep]) el.classList.add('target'); });
-            }
+            if (currentStep < currentSong.length) keyElements.forEach(el => { if (el.dataset.note === currentSong[currentStep]) el.classList.add('target'); });
             document.getElementById('progress-text').innerText = `Note ${currentStep + 1} of ${currentSong.length}`;
         }
 
@@ -114,15 +117,18 @@
             const element = keyElements[index];
             element.classList.add('active-playing');
             setTimeout(() => element.classList.remove('active-playing'), 150);
-            if (key.note === currentSong[currentStep]) {
+            
+            if (key.note !== "" && key.note === currentSong[currentStep]) {
                 element.classList.add('success');
                 currentStep++;
                 if (currentStep >= currentSong.length) startParty();
                 else setTimeout(updateTarget, 250);
             }
             playGrandTone(key.freq);
-            const jumpHeight = (index * 20); 
-            document.getElementById('dino').style.transform = `translateY(-${jumpHeight}px)`;
+            
+            // Move Dino
+            document.getElementById('dino').style.transform = `translateY(-${index * 22}px)`;
+            lastDinoNote = index;
         }
 
         function startParty() {
@@ -130,31 +136,59 @@
             document.getElementById('reset-party-btn').classList.remove('hidden');
             document.getElementById('party-message').classList.remove('hidden');
             document.getElementById('instruction').classList.add('hidden');
-            for(let i=0; i<30; i++) {
-                const pd = document.createElement('div'); pd.className = 'party-dino'; pd.innerText = '🦖'; pd.style.left = Math.random()*80 + 10 + 'vw'; pd.style.top = Math.random()*40 + 10 + 'vh'; document.body.appendChild(pd);
-            }
+            document.getElementById('dino-container').classList.add('hidden');
             playPartyMusic();
         }
 
         function playPartyMusic() {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            partyInterval = setInterval(() => {
-                const time = audioCtx.currentTime;
-                [0, 0.2, 0.4, 0.6].forEach(offset => {
-                    const osc = audioCtx.createOscillator();
-                    const gain = audioCtx.createGain();
-                    osc.frequency.setValueAtTime(150 + Math.random() * 200, time + offset);
-                    gain.gain.setValueAtTime(0.4, time + offset);
-                    gain.gain.exponentialRampToValueAtTime(0.01, time + offset + 0.15);
-                    osc.connect(gain);
-                    gain.connect(audioCtx.destination);
-                    osc.start(time + offset);
-                    osc.stop(time + offset + 0.15);
+            const chords = [
+                {f:[261.6, 329.6, 392.0], d:0.5}, {f:[293.7, 349.2, 440.0], d:0.5},
+                {f:[329.6, 392.0, 493.9], d:0.5}, {f:[261.6, 329.6, 392.0], d:1.0}
+            ];
+            let step = 0;
+            const loop = () => {
+                if (!isPartyActive) return;
+                const c = chords[step % chords.length];
+                c.f.forEach(f => {
+                    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+                    o.type = 'square'; o.frequency.value = f; 
+                    g.gain.setValueAtTime(0.15, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + c.d);
+                    o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + c.d);
                 });
-            }, 800);
+                step++;
+                setTimeout(loop, 400);
+            };
+            loop();
         }
-        
+
         function resetGameAfterParty() { loadSong(); }
+        
+        async function toggleMic() {
+            if (isMicActive) { location.reload(); return; }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const analyzer = audioCtx.createAnalyser();
+                const source = audioCtx.createMediaStreamSource(stream);
+                source.connect(analyzer);
+                analyzer.fftSize = 2048;
+                isMicActive = true;
+                document.getElementById('mic-btn').innerText = "✅ Mic Listening...";
+                
+                const buffer = new Float32Array(analyzer.fftSize);
+                const detect = () => {
+                    if (!isMicActive) return;
+                    analyzer.getFloatTimeDomainData(buffer);
+                    let sum = 0;
+                    for (let i = 0; i < buffer.length; i++) sum += buffer[i] * buffer[i];
+                    if (Math.sqrt(sum / buffer.length) > 0.05) { // Amplitude Gate
+                        // Simple pitch correlation could be here, but we'll stick to visual trigger for safety
+                    }
+                    requestAnimationFrame(detect);
+                };
+                detect();
+            } catch (e) { console.error("Mic access denied"); }
+        }
+
         loadSong();
     </script>
 </body>
