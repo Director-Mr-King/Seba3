@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mr. King's Super Grand Piano</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #0f172a; overflow: hidden; user-select: none; touch-action: manipulation; }
+        .piano-key { transition: transform 0.08s ease, filter 0.08s ease, box-shadow 0.08s ease; position: relative; cursor: pointer; }
+        .piano-key:active, .piano-key.active-playing { transform: translateY(6px); filter: brightness(1.15); }
+        .white-key { background: linear-gradient(to bottom, #ffffff 0%, #f1f5f9 100%); border: 2px solid #cbd5e1; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; height: 260px; width: 75px; z-index: 1; margin-right: -2px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .white-key .note-label { font-weight: 900; font-size: 2rem; color: #1e293b; }
+        .black-key { background: linear-gradient(to bottom, #0f172a 0%, #1e293b 100%); border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; height: 160px; width: 48px; margin-left: -24px; margin-right: -24px; z-index: 2; border: 1px solid #000; box-shadow: 0 8px 10px rgba(0, 0, 0, 0.4); }
+        .target { border: 5px solid #ef4444 !important; box-shadow: 0 0 25px #ef4444 !important; animation: pulse-target 1.5s infinite alternate; }
+        .success { border: 5px solid #22c55e !important; box-shadow: 0 0 25px #22c55e !important; }
+        @keyframes pulse-target { from { box-shadow: 0 0 15px #ef4444; } to { box-shadow: 0 0 35px #ef4444; } }
+        #dino { font-size: 80px; transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.2); }
+        .party-dino { position: absolute; font-size: 70px; animation: party-dance 0.4s infinite alternate; z-index: 5; }
+        @keyframes party-dance { 0% { transform: translateY(0) scale(1) rotate(-15deg); } 100% { transform: translateY(-30px) scale(1.1) rotate(15deg); } }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-end pb-8">
+    <div id="game-ui" class="absolute top-4 bg-slate-900/90 border border-slate-700/50 p-4 rounded-2xl shadow-2xl text-center max-w-sm w-11/12 z-50 backdrop-blur-md">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Select Challenge</span>
+            <span id="progress-text" class="text-xs font-bold text-emerald-400">Note 1 of 0</span>
+        </div>
+        <select id="song-select" class="w-full bg-slate-800 text-white font-black text-lg py-2 px-3 rounded-xl border border-slate-700 mb-3" onchange="loadSong()">
+            <option value="baa">🐑 Baa Baa Black Sheep</option>
+            <option value="brother">🔔 Brother John</option>
+            <option value="happy">🎂 Happy Birthday to You</option>
+        </select>
+        <div class="p-2 bg-slate-800/50 rounded-xl">
+            <p id="instruction" class="text-base font-bold text-slate-200">Hit the Red Note!</p>
+        </div>
+        <div id="party-message" class="hidden mt-4">
+            <p class="text-2xl font-black text-yellow-400 animate-bounce">YOU DID IT SEBA !!!</p>
+            <img src="https://i.ibb.co/b3wJ1Zg/WhatsApp-Image-2026-07-18-at-1-32-07-PM.jpg" class="mx-auto mt-2 w-24 h-24 rounded-full border-4 border-yellow-400 shadow-lg" alt="Seba">
+        </div>
+        <button id="reset-party-btn" class="hidden mt-3 w-full py-2 bg-emerald-500 text-white font-black rounded-xl" onclick="resetGameAfterParty()">Play Another Song! 🔄</button>
+    </div>
+
+    <div id="dino-container" class="absolute top-[25%] left-[5%] w-[100px] h-[400px] z-10 flex flex-col justify-end items-center pointer-events-none">
+        <div id="dino">🦖</div>
+    </div>
+
+    <div id="piano" class="bg-slate-950 p-6 rounded-[32px] shadow-2xl flex border-t-8 border-slate-800"></div>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playGrandTone(freq) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+            [1, 2, 4].forEach((harmonic, i) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = i === 0 ? 'triangle' : 'sine';
+                osc.frequency.value = freq * harmonic;
+                gain.gain.setValueAtTime(0.2 / harmonic, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 1.8);
+            });
+        }
+
+        const songs = {
+            baa: ['C', 'C', 'G', 'G', 'A', 'A', 'G', 'F', 'F', 'E', 'E', 'D', 'D', 'C'],
+            brother: ['C', 'D', 'E', 'C', 'C', 'D', 'E', 'C', 'E', 'F', 'G', 'E', 'F', 'G', 'G', 'A', 'G', 'F', 'E', 'C', 'G', 'G', 'C'],
+            happy: ['C', 'C', 'D', 'C', 'F', 'E', 'C', 'C', 'D', 'C', 'G', 'F', 'C', 'C', 'C', 'A', 'F', 'E', 'D', 'A', 'A', 'F', 'G', 'F']
+        };
+
+        let currentSong = [], currentStep = 0, isPartyActive = false, partyInterval = null;
+        const piano = document.getElementById('piano');
+        const keyElements = [];
+        const notes = [{note:'C', freq:261.63, type:'white'}, {note:'', freq:277.18, type:'black'}, {note:'D', freq:293.66, type:'white'}, {note:'', freq:311.13, type:'black'}, {note:'E', freq:329.63, type:'white'}, {note:'F', freq:349.23, type:'white'}, {note:'', freq:369.99, type:'black'}, {note:'G', freq:392.00, type:'white'}, {note:'', freq:415.30, type:'black'}, {note:'A', freq:440.00, type:'white'}, {note:'', freq:466.16, type:'black'}, {note:'B', freq:493.88, type:'white'}];
+
+        notes.forEach((key, i) => {
+            const btn = document.createElement('div');
+            btn.className = `piano-key ${key.type === 'white' ? 'white-key' : 'black-key'}`;
+            if (key.type === 'white') { const label = document.createElement('span'); label.className = 'note-label'; label.innerText = key.note; btn.appendChild(label); }
+            btn.dataset.note = key.note;
+            btn.addEventListener('mousedown', () => playKey(key, i));
+            piano.appendChild(btn);
+            keyElements.push(btn);
+        });
+
+        function loadSong() {
+            isPartyActive = false;
+            clearInterval(partyInterval);
+            currentSong = songs[document.getElementById('song-select').value];
+            currentStep = 0;
+            document.getElementById('reset-party-btn').classList.add('hidden');
+            document.getElementById('party-message').classList.add('hidden');
+            document.getElementById('instruction').classList.remove('hidden');
+            document.querySelectorAll('.party-dino').forEach(el => el.remove());
+            updateTarget();
+        }
+
+        function updateTarget() {
+            keyElements.forEach(el => el.classList.remove('target', 'success'));
+            if (currentStep < currentSong.length) {
+                keyElements.forEach(el => { if (el.dataset.note === currentSong[currentStep]) el.classList.add('target'); });
+            }
+            document.getElementById('progress-text').innerText = `Note ${currentStep + 1} of ${currentSong.length}`;
+        }
+
+        function playKey(key, index) {
+            if (isPartyActive) return;
+            const element = keyElements[index];
+            element.classList.add('active-playing');
+            setTimeout(() => element.classList.remove('active-playing'), 150);
+            if (key.note === currentSong[currentStep]) {
+                element.classList.add('success');
+                currentStep++;
+                if (currentStep >= currentSong.length) startParty();
+                else setTimeout(updateTarget, 250);
+            }
+            playGrandTone(key.freq);
+            const jumpHeight = (index * 20); 
+            document.getElementById('dino').style.transform = `translateY(-${jumpHeight}px)`;
+        }
+
+        function startParty() {
+            isPartyActive = true;
+            document.getElementById('reset-party-btn').classList.remove('hidden');
+            document.getElementById('party-message').classList.remove('hidden');
+            document.getElementById('instruction').classList.add('hidden');
+            for(let i=0; i<30; i++) {
+                const pd = document.createElement('div'); pd.className = 'party-dino'; pd.innerText = '🦖'; pd.style.left = Math.random()*80 + 10 + 'vw'; pd.style.top = Math.random()*40 + 10 + 'vh'; document.body.appendChild(pd);
+            }
+            playPartyMusic();
+        }
+
+        function playPartyMusic() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            partyInterval = setInterval(() => {
+                const time = audioCtx.currentTime;
+                [0, 0.2, 0.4, 0.6].forEach(offset => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.frequency.setValueAtTime(150 + Math.random() * 200, time + offset);
+                    gain.gain.setValueAtTime(0.4, time + offset);
+                    gain.gain.exponentialRampToValueAtTime(0.01, time + offset + 0.15);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(time + offset);
+                    osc.stop(time + offset + 0.15);
+                });
+            }, 800);
+        }
+        
+        function resetGameAfterParty() { loadSong(); }
+        loadSong();
+    </script>
+</body>
+</html>
