@@ -13,12 +13,13 @@
         .white-key { background: linear-gradient(to bottom, #ffffff 0%, #f1f5f9 100%); border: 2px solid #cbd5e1; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; height: 260px; width: 75px; z-index: 1; margin-right: -2px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
         .white-key .note-label { font-weight: 900; font-size: 2rem; color: #1e293b; }
         .black-key { background: linear-gradient(to bottom, #0f172a 0%, #1e293b 100%); border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; height: 160px; width: 48px; margin-left: -24px; margin-right: -24px; z-index: 2; border: 1px solid #000; box-shadow: 0 8px 10px rgba(0, 0, 0, 0.4); }
-        .target { border: 5px solid #ef4444 !important; box-shadow: 0 0 25px #ef4444 !important; animation: pulse-target 1.5s infinite alternate; }
+        .target { border: 5px solid #ef4444 !important; box-shadow: 0 0 25px #ef4444 !important; }
         .success { border: 5px solid #22c55e !important; box-shadow: 0 0 25px #22c55e !important; }
-        @keyframes pulse-target { from { box-shadow: 0 0 15px #ef4444; } to { box-shadow: 0 0 35px #ef4444; } }
-        #dino { font-size: 80px; position: absolute; transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.2); }
-        .zoom-pulse { animation: zoom-slow 3s infinite ease-in-out; }
-        @keyframes zoom-slow { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        #dino { font-size: 80px; transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.2); }
+        .celebrating { animation: jump-bounce 0.5s infinite; }
+        @keyframes jump-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-50px); } }
+        .zoom-pulse { animation: zoom-slow 4s infinite ease-in-out; }
+        @keyframes zoom-slow { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-end pb-8">
@@ -40,7 +41,7 @@
         </div>
         <div id="party-message" class="hidden mt-4">
             <p class="text-3xl font-black text-yellow-400 animate-bounce mb-2">YOU DID IT SEBA !!!</p>
-            <img src="KING.jpeg" class="mx-auto mt-2 w-72 h-72 rounded-full border-4 border-yellow-400 shadow-lg zoom-pulse" alt="Seba">
+            <img src="image_0c101e.jpg" class="mx-auto mt-2 w-72 h-72 rounded-full border-4 border-yellow-400 shadow-lg zoom-pulse" alt="Seba">
         </div>
         <button id="reset-party-btn" class="hidden mt-3 w-full py-2 bg-emerald-500 text-white font-black rounded-xl" onclick="resetGameAfterParty()">Play Another Song! 🔄</button>
     </div>
@@ -53,7 +54,7 @@
 
     <script>
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        let isMicActive = false, isPartyActive = false, currentSong = [], currentStep = 0, lastDinoNote = 0;
+        let isMicActive = false, isPartyActive = false, currentSong = [], currentStep = 0;
         
         const notes = [
             {note:'C', freq:261.63, type:'white'}, {note:'', freq:277.18, type:'black'}, {note:'D', freq:293.66, type:'white'}, {note:'', freq:311.13, type:'black'}, {note:'E', freq:329.63, type:'white'}, {note:'F', freq:349.23, type:'white'}, {note:'', freq:369.99, type:'black'}, {note:'G', freq:392.00, type:'white'}, {note:'', freq:415.30, type:'black'}, {note:'A', freq:440.00, type:'white'}, {note:'', freq:466.16, type:'black'}, {note:'B', freq:493.88, type:'white'}
@@ -79,7 +80,7 @@
             keyElements.push(btn);
         });
 
-        function playGrandTone(freq, duration = 1.2) {
+        function playGrandTone(freq, duration = 1.5) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
             const now = audioCtx.currentTime;
             [1, 2.01, 3.05, 4.1].forEach((h, i) => {
@@ -103,6 +104,7 @@
             document.getElementById('party-message').classList.add('hidden');
             document.getElementById('instruction').classList.remove('hidden');
             document.getElementById('dino-container').classList.remove('hidden');
+            document.getElementById('dino').classList.remove('celebrating');
             updateTarget();
         }
 
@@ -125,10 +127,7 @@
                 else setTimeout(updateTarget, 250);
             }
             playGrandTone(key.freq);
-            
-            // Move Dino
-            document.getElementById('dino').style.transform = `translateY(-${index * 22}px)`;
-            lastDinoNote = index;
+            document.getElementById('dino').style.transform = `translateY(-${index * 20}px)`;
         }
 
         function startParty() {
@@ -136,32 +135,23 @@
             document.getElementById('reset-party-btn').classList.remove('hidden');
             document.getElementById('party-message').classList.remove('hidden');
             document.getElementById('instruction').classList.add('hidden');
-            document.getElementById('dino-container').classList.add('hidden');
-            playPartyMusic();
+            document.getElementById('dino').classList.add('celebrating');
+            playSaintsFanfare();
         }
 
-        function playPartyMusic() {
-            const chords = [
-                {f:[261.6, 329.6, 392.0], d:0.5}, {f:[293.7, 349.2, 440.0], d:0.5},
-                {f:[329.6, 392.0, 493.9], d:0.5}, {f:[261.6, 329.6, 392.0], d:1.0}
-            ];
+        function playSaintsFanfare() {
+            const chords = [261.6, 329.6, 392.0, 440.0, 392.0, 329.6, 261.6];
             let step = 0;
-            const loop = () => {
-                if (!isPartyActive) return;
-                const c = chords[step % chords.length];
-                c.f.forEach(f => {
-                    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-                    o.type = 'square'; o.frequency.value = f; 
-                    g.gain.setValueAtTime(0.15, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + c.d);
-                    o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + c.d);
-                });
+            const interval = setInterval(() => {
+                if (!isPartyActive) { clearInterval(interval); return; }
+                const freq = chords[step % chords.length];
+                playGrandTone(freq, 0.8);
                 step++;
-                setTimeout(loop, 400);
-            };
-            loop();
+                if (step >= 20) clearInterval(interval);
+            }, 250);
         }
 
-        function resetGameAfterParty() { loadSong(); }
+        function resetGameAfterParty() { location.reload(); }
         
         async function toggleMic() {
             if (isMicActive) { location.reload(); return; }
@@ -173,20 +163,14 @@
                 analyzer.fftSize = 2048;
                 isMicActive = true;
                 document.getElementById('mic-btn').innerText = "✅ Mic Listening...";
-                
                 const buffer = new Float32Array(analyzer.fftSize);
                 const detect = () => {
                     if (!isMicActive) return;
                     analyzer.getFloatTimeDomainData(buffer);
-                    let sum = 0;
-                    for (let i = 0; i < buffer.length; i++) sum += buffer[i] * buffer[i];
-                    if (Math.sqrt(sum / buffer.length) > 0.05) { // Amplitude Gate
-                        // Simple pitch correlation could be here, but we'll stick to visual trigger for safety
-                    }
                     requestAnimationFrame(detect);
                 };
                 detect();
-            } catch (e) { console.error("Mic access denied"); }
+            } catch (e) { alert("Mic access denied"); }
         }
 
         loadSong();
